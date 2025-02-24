@@ -34,9 +34,14 @@ class TransformerModel(nn.Module):
         
         self.fc_out = nn.Linear(embed_size, vocab_size)  # Output layer
 
-    def forward(self, src, tgt):
+    def forward(self, src, tgt=None):
         # Ensure src and tgt have the same sequence length
         src = self.embedding(src) + self.pos_encoding[:, :src.size(1), :]
+        
+        if tgt is None:  # Inference mode
+            batch_size, seq_len = src.shape[0], src.shape[1]
+            tgt = torch.zeros((batch_size, seq_len), dtype=torch.long, device=src.device)        
+        
         tgt = self.embedding(tgt) + self.pos_encoding[:, :tgt.size(1), :]
 
         # Ensure Transformer receives same length sequences
@@ -47,61 +52,63 @@ class TransformerModel(nn.Module):
         output = self.transformer(src, tgt)
         return self.fc_out(output)
 
-# GPU hardware acceleration
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Training on device: {device}")
+if __name__ == "__main__":
 
-# Instantiate Model
-model = TransformerModel(VOCAB_SIZE, EMBED_SIZE, NUM_LAYERS, NUM_HEADS, FFN_HIDDEN).to(device)
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-criterion = nn.CrossEntropyLoss().to(device)
+    # GPU hardware acceleration
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Training on device: {device}")
 
-# Custom Dataset Loader
-class JSONDataset(Dataset):
-    def __init__(self, json_file):
-        with open(json_file, "r") as f:
-            self.data = json.load(f)  # Load entire JSON into memory
+    # Instantiate Model
+    model = TransformerModel(VOCAB_SIZE, EMBED_SIZE, NUM_LAYERS, NUM_HEADS, FFN_HIDDEN).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    criterion = nn.CrossEntropyLoss().to(device)
 
-    def __len__(self):
-        return len(self.data)
+    # Custom Dataset Loader
+    class JSONDataset(Dataset):
+        def __init__(self, json_file):
+            with open(json_file, "r") as f:
+                self.data = json.load(f)  # Load entire JSON into memory
 
-    def __getitem__(self, idx):
-        return torch.tensor(self.data[idx], dtype=torch.long)  # Convert to tensor
+        def __len__(self):
+            return len(self.data)
 
-# Load dataset
-dataset = JSONDataset("training_set.json")
-dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
+        def __getitem__(self, idx):
+            return torch.tensor(self.data[idx], dtype=torch.long)  # Convert to tensor
 
-# Training loop
-for epoch in range(EPOCHS):
-    
-    start_time = time.time()
-    
-    for batch in dataloader:
-        batch = batch.to(device)  # Move batch to GPU/CPU
+    # Load dataset
+    dataset = JSONDataset("training_set.json")
+    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-        src = batch[:, :-1]  # Input tokens
-        tgt = batch[:, 1:]   # Target tokens (shifted right)
+    # Training loop
+    for epoch in range(EPOCHS):
+        
+        start_time = time.time()
+        
+        for batch in dataloader:
+            batch = batch.to(device)  # Move batch to GPU/CPU
 
-        optimizer.zero_grad()
-        output = model(src, tgt)
+            src = batch[:, :-1]  # Input tokens
+            tgt = batch[:, 1:]   # Target tokens (shifted right)
 
-        # Ensure output and target have the same shape
-        min_seq_length = min(output.size(1), tgt.size(1))
-        output = output[:, :min_seq_length, :]
-        tgt = tgt[:, :min_seq_length]
+            optimizer.zero_grad()
+            output = model(src, tgt)
 
-        loss = criterion(output.view(-1, VOCAB_SIZE), tgt.reshape(-1))
-        loss.backward()
-        optimizer.step()
+            # Ensure output and target have the same shape
+            min_seq_length = min(output.size(1), tgt.size(1))
+            output = output[:, :min_seq_length, :]
+            tgt = tgt[:, :min_seq_length]
 
-    end_time = time.time()
-    
-    print(f"Epoch {epoch+1}/{EPOCHS}, Loss: {loss.item():.4f}, time taken: {end_time - start_time:.2f} seconds")
-    if loss.item() < 0.001:
-        break
+            loss = criterion(output.view(-1, VOCAB_SIZE), tgt.reshape(-1))
+            loss.backward()
+            optimizer.step()
 
-print("Training complete! 🎉")
+        end_time = time.time()
+        
+        print(f"Epoch {epoch+1}/{EPOCHS}, Loss: {loss.item():.4f}, time taken: {end_time - start_time:.2f} seconds")
+        if loss.item() < 0.001:
+            break
 
-# Save model
-torch.save(model.state_dict(), "transformer_model.pth")
+    print("Training complete! 🎉")
+
+    # Save model
+    torch.save(model.state_dict(), "transformer_model.pth")
