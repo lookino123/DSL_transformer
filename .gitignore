@@ -1,2 +1,5 @@
 # Exclude virtual environment directories
 transformerVenv/
+__pycache__/
+.vscode/
+*.pth

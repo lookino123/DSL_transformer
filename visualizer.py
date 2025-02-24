@@ -81,7 +81,9 @@ while running:
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP:
                 index = (index - 1) % len(training_set)
-                matrix = np.array(training_set[index])
+                code = training_set[index][-1]
+                linear = training_set[index][:-1]
+                matrix = np.array(linear).reshape(matrix_size)
             elif event.key == pygame.K_DOWN:
                 index = (index + 1) % len(training_set)
                 code = training_set[index][-1]
