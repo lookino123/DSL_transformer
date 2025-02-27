@@ -5,7 +5,7 @@ import json
 import DSL
 import time
 
-training_set_size = 16384
+training_set_size = 16*1024
 training_set = []
 
 size=10
@@ -25,19 +25,19 @@ for i in range(training_set_size):
     space[x_offset:x_offset+shapesize, y_offset:y_offset+shapesize] = shape
     space[x_offset:x_offset+shapesize, size+y_offset:size+y_offset+shapesize] = transformed_shape
 
-    flat_space = space.flatten()   
-    flat_space = np.append(flat_space, code)    
+    flat_space = space.flatten()      
     
-    training_set.append(flat_space.tolist())    
+    training_set.append({"src": flat_space.tolist(), "tgt": code})
+  
 
-output_file = '/home/dorkydino/Dropbox/Repo/transformer_DSL/training_set.json'
+output_file = 'training_set.json'
 with open(output_file, 'w') as f:
-    json.dump(training_set, f)
+    json.dump(training_set, f, indent=1)
 print('Training set saved to', output_file)
 
 end_time = time.time()
 execution_time = end_time - start_time
-print(f"Execution time: {execution_time} seconds")
+print(f"Execution time: {execution_time:.2f} seconds, {int(training_set_size/execution_time)} samples per second")
 
     
 

@@ -1,6 +1,6 @@
 import torch
 import json
-from training import TransformerModel 
+import transformerModel 
 
 # Set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

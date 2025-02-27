@@ -1,4 +1,5 @@
-import transformerModel
+from transformerModel import myModel
+from transformerModel import dslClassificationDataset
 import torch 
 import json
 import time
@@ -6,43 +7,62 @@ from torch.utils.data import Dataset, DataLoader
 
 if __name__ == "__main__":
     
-    EPOCHS = 16       # Number of epochs
-    BATCH_SIZE = 16   # Training batch size
-
-    M = myModel()
+    EPOCHS = 4       # Number of epochs
+    BATCH_SIZE = 8   # Training batch size
     
-    # Custom Dataset Loader
-    class JSONDataset(Dataset):
-        def __init__(self, json_file):
-            with open(json_file, "r") as f:
-                self.data = json.load(f)  # Load entire JSON into memory
-
-        def __len__(self):
-            return len(self.data)
-
-        def __getitem__(self, idx):
-            return torch.tensor(self.data[idx], dtype=torch.long)  # Convert to tensor
-
-    # Load dataset
-    dataset = JSONDataset("training_set.json")
-    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
-
-    loss = 1
+    TRAIN = True
+    INFER = True
     
-    # Training loop
-    for epoch in range(EPOCHS):
-        start_time = time.time()
+    MODEL_FILENAME = "transformer_model.pth"
+    DATA_FILENAME = "training_set.json"
+
+    if TRAIN:
+        M = myModel()
+    
+        # Load dataset
+        dataset = dslClassificationDataset(DATA_FILENAME)
+        dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
+
         
-        for batch in dataloader:
-            M.runBatch(batch)
+        # Training loop
+        for epoch in range(EPOCHS):
+            start_time = time.time()
             
-        end_time = time.time()
-        loss =M.getLoss()
-        print(f"Epoch {epoch+1}/{EPOCHS}, Loss: {loss:.4f}, time taken: {end_time - start_time:.2f} seconds")
-        if loss < 0.001:
-            break
+            total_loss = 0
 
-    print("Training complete! 🎉")
+            for src_batch, tgt_batch in dataloader:
 
-    # Save model
-    torch.save(model.state_dict(), "transformer_model.pth")
+                loss = M.trainBatch(src_batch, tgt_batch)
+                total_loss += loss
+
+            end_time = time.time()
+                    
+            print(f"Epoch {epoch+1}, Loss: {total_loss / len(dataset):.4f}, Time: {end_time - start_time:.2f}s")
+
+        print("Training complete! 🎉")
+
+        # Save model
+        M.saveModel(MODEL_FILENAME)
+        print("Model saved!")
+        
+    if INFER:
+        M = myModel(MODEL_FILENAME)
+        
+        dataset = dslClassificationDataset(DATA_FILENAME)
+        dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+        
+        for i in range(16):
+            src_input, tgt = next(iter(dataloader))
+
+            # print(f"size = {src_input.size()}")
+            # print(f"scr_input \n {src_input}")
+
+            prediction, tensor = M.infer(src_input)
+            
+            print(f"Inferred {prediction}, expected = {tgt.item()}")
+            print(tensor)
+            print(src_input)
+            print("")
+        
+        print("Inference complete! 🎉")
+
